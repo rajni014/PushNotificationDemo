@@ -1,8 +1,22 @@
+import 'react-native-gesture-handler';
+import {Alert, StyleSheet, Text, View} from 'react-native';
 import React, {useEffect} from 'react';
-import {StyleSheet, Text, View} from 'react-native';
-import notifee from '@notifee/react-native';
 import messaging from '@react-native-firebase/messaging';
+import notifee, {EventType} from '@notifee/react-native';
+import {createStackNavigator} from '@react-navigation/stack';
+import {NavigationContainer} from '@react-navigation/native';
+import Home from './src/screens/Home';
+import Profile from './src/screens/Profile';
+import Setting from './src/screens/Setting';
 import {getFCMToken} from './src/utils/FcmServices';
+
+export const navigationRef = React.createRef();
+
+export function navigate(name, params) {
+  navigationRef.current?.navigate(name, params);
+}
+
+const Stack = createStackNavigator();
 
 const App = () => {
   useEffect(() => {
@@ -32,18 +46,63 @@ const App = () => {
           },
         },
       });
+
+      // if app is in forground state and opened from notification
+      notifee.onForegroundEvent(({type, detail}) => {
+        switch (type) {
+          case EventType.PRESS:
+            if (remoteMessage?.data?.redirectTo == 'profile') {
+              navigationRef.current?.navigate('Profile');
+            } else if (remoteMessage?.data?.redirectTo == 'setting') {
+              navigationRef.current?.navigate('Setting');
+            }
+            break;
+        }
+      });
     });
+
+    // if app is in background state and opened from notification
+    messaging().onNotificationOpenedApp(remoteMessage => {
+      if (remoteMessage) {
+        if (remoteMessage?.data?.redirectTo == 'profile') {
+          navigationRef.current?.navigate('Profile');
+        } else if (remoteMessage?.data?.redirectTo == 'setting') {
+          navigationRef.current?.navigate('Setting');
+        }
+      }
+    });
+
+    // if app is in quite state and opened from notification
+    messaging()
+      .getInitialNotification()
+      .then(remoteMessage => {
+        setTimeout(() => {
+          if (remoteMessage) {
+            if (remoteMessage?.data?.redirectTo == 'profile') {
+              navigationRef.current?.navigate('Profile');
+            } else if (remoteMessage?.data?.redirectTo == 'setting') {
+              navigationRef.current?.navigate('Setting');
+            }
+          }
+        }, 500);
+      });
 
     return unsubscribe;
   }, []);
 
   return (
-    <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-      <Text>App</Text>
-    </View>
+    <NavigationContainer ref={navigationRef}>
+      <Stack.Navigator>
+        <Stack.Screen name="Home" component={Home} />
+        <Stack.Screen name="Profile" component={Profile} />
+        <Stack.Screen name="Setting" component={Setting} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 };
 
 export default App;
 
-const styles = StyleSheet.create({});
+const styles = StyleSheet.create({
+  container: {flex: 1, alignItems: 'center', justifyContent: 'center'},
+});
